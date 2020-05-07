@@ -13,6 +13,8 @@ import lxml.html
 import requests
 from lxml.cssselect import CSSSelector
 
+import multiprocessing
+
 YOUTUBE_VIDEO_URL = 'https://www.youtube.com/watch?v={youtube_id}'
 YOUTUBE_COMMENTS_AJAX_URL_OLD = 'https://www.youtube.com/comment_ajax'
 YOUTUBE_COMMENTS_AJAX_URL_NEW = 'https://www.youtube.com/comment_service_ajax'
@@ -32,6 +34,9 @@ def ajax_request(session, url, params=None, data=None, headers=None, retries=5, 
         if response.status_code == 200:
             return response.json()
         if response.status_code == 413:
+            return {}
+        elif response.status_code == 403: #Invalid request, likely because comments disabled
+            print("Nothing to download! Video has likely disabled comments.")
             return {}
         else:
             time.sleep(sleep)
@@ -223,6 +228,9 @@ def main(argv):
         print('Downloading Youtube comments for video:', youtube_id)
         count = 0
         with io.open(output, 'w', encoding='utf8') as fp:
+
+            comments = download_comments(youtube_id)
+
             for comment in download_comments(youtube_id):
                 comment_json = json.dumps(comment, ensure_ascii=False)
                 print(comment_json.decode('utf-8') if isinstance(comment_json, bytes) else comment_json, file=fp)
@@ -231,7 +239,7 @@ def main(argv):
                 sys.stdout.flush()
                 if limit and count >= limit:
                     break
-        print('\nDone!')
+        sys.stdout.write('Done! Downloaded %d comments(s)\n' % count)
 
     except Exception as e:
         print('Error:', str(e))
